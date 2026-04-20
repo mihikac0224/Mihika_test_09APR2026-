@@ -1,0 +1,357 @@
+---
+title: "Comparative Data Analysis Report"
+author: "Mihika Choudhary"
+date: "2026-04-15"
+format: pdf
+editor: visual
+
+number-sections: true
+toc: true
+toc-depth: 4
+cap-location: top
+fig-align: center
+fig-pos: "htbp"
+
+code-annotations: below
+code-overflow: wrap
+
+pdf-engine: xelatex
+mainfont: "Times New Roman"
+monofont: "Courier New"
+
+fontsize: 11pt
+linestretch: 1.15
+
+latex-tinytex: true
+
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+# Busiest Airports Analysis
+
+## Overview
+
+This data set examine and interprets passenger traffic for six major airports from 2020 to 2025. The goal in this section is to understand how passenger traffic changed over the span of five years, how the airports compare to each other, and any other trends we can conclude from the visualizations. The table section shows exact values of passengers in each airport each year, while the graph helps visualize the data as a whole.
+
+```{r}
+#| include: false
+
+library(rvest)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(purrr)
+library(readr)
+library(tibble)
+library(ggplot2)
+
+url <- "https://en.wikipedia.org/wiki/List_of_busiest_airports_by_passenger_traffic"
+
+airport_lookup <- tibble(
+  airport = c(
+    "Hartsfield-Jackson Atlanta International Airport",
+    "Frankfurt Airport",
+    "Dallas Fort Worth International Airport",
+    "Denver International Airport",
+    "Los Angeles International Airport",
+    "O'Hare International Airport"
+  ),
+  code = c("ATL", "FRA", "DFW", "DEN", "LAX", "ORD")
+) |>
+  mutate(
+    airport_key = airport |>
+      str_replace_all("–|—", "-") |>
+      str_squish()
+  )
+
+wiki_tables <- read_html(url) |>
+  html_elements("table.wikitable") |>
+  html_table(fill = TRUE)
+
+years <- 2025:2020
+
+clean_airport_table <- function(tbl, year_value) {
+  names(tbl) <- names(tbl) |>
+    str_to_lower() |>
+    str_replace_all("[^a-z0-9]+", "_") |>
+    str_replace_all("^_|_$", "")
+
+  airport_col <- names(tbl)[str_detect(names(tbl), "^airport$|airport")][1]
+  passenger_col <- names(tbl)[str_detect(names(tbl), "total.*passengers|passengers")][1]
+
+  tbl |>
+    transmute(
+      year = year_value,
+      airport = .data[[airport_col]],
+      passengers = .data[[passenger_col]]
+    ) |>
+    mutate(
+      airport = airport |>
+        str_remove_all("\\[[^\\]]*\\]") |>
+        str_squish(),
+      airport_key = airport |>
+        str_replace_all("–|—", "-") |>
+        str_squish(),
+      passengers = passengers |>
+        str_remove_all("\\[[^\\]]*\\]") |>
+        parse_number()
+    ) |>
+    inner_join(airport_lookup, by = "airport_key") |>
+    select(year, code, airport = airport.y, passengers)
+}
+
+airports_tidy <- map2_dfr(wiki_tables[1:6], years, clean_airport_table) |>
+  arrange(airport, year)
+```
+
+## Busiest Airports: Passenger Traffic Table
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(gt)
+library(scales)
+
+airports_table <- airports_tidy |>
+  mutate(passengers = round(passengers, 0)) |>
+  pivot_wider(
+    names_from = year,
+    values_from = passengers
+  ) |>
+  arrange(airport) |>
+  gt() |>
+  fmt_number(
+    columns = c(`2020`, `2021`, `2022`, `2023`, `2024`, `2025`),
+    decimals = 0,
+    sep_mark = ","
+  ) |>
+  cols_label(
+    airport = "Airport",
+    code = "Code",
+    `2020` = "2020",
+    `2021` = "2021",
+    `2022` = "2022",
+    `2023` = "2023",
+    `2024` = "2024",
+    `2025` = "2025"
+  ) |>
+  tab_options(
+    table.font.size = px(9)
+  ) |>
+  tab_header(
+    title = "Passenger Traffic for Six Busy Airports",
+    subtitle = "Annual passenger totals from 2020 to 2025"
+  )
+
+airports_table
+```
+
+##### **When prompted with the busiest airports table,** ChatGPT-5.3 **generated Alt text and Long Description text describing the structure of the table, including airport names, codes, and annual passenger totals from 2020 to 2025. (This exchange took place on April 15, 2026)**
+
+### Alt Text:
+
+Table showing annual passenger traffic for six major airports from 2020 to 2025. Rows list the airports and their codes, and columns show yearly passenger totals. The table shows that passenger traffic generally increases after 2020, with Atlanta having the highest totals across all years.
+
+### Long Description:
+
+This table shows passenger totals for six major airports from 2020 through 2025. Each row represents one airport, and each column shows the number of passengers for a specific year. The table makes it easy to compare exact values across both airports and years. One clear pattern is that 2020 has the lowest passenger totals for all airports, while the numbers increase in later years. Atlanta has the highest passenger counts throughout the table, while Frankfurt remains lower than the others, even though it also increases over time. Overall, the table helps show both the recovery in air travel after 2020 and the differences in scale between the airports.
+
+## Busiest Airports: Passenger Traffic Graph
+
+```{r}
+#| label: fig-airports
+#| fig-cap: "Passenger traffic trends for six major airports from 2020 to 2025."
+#| fig-width: 9
+#| fig-height: 5
+
+ggplot(
+  airports_tidy,
+  aes(x = year, y = passengers, color = code, group = code)
+) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  scale_x_continuous(breaks = 2020:2025) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(
+    title = "Passenger Traffic for Six Busy Airports",
+    subtitle = "Annual passenger totals from 2020 to 2025",
+    x = "Year",
+    y = "Passengers",
+    color = "Airport Code"
+  ) +
+  theme_minimal()
+```
+
+##### When prompted with the passenger traffic line graph for six major airports, ChatGPT-5.3 generated Alt text and Long Description text describing the trends, comparisons between airports, and overall changes from 2020 to 2025. (This exchange took place on April 15, 2026)
+
+### Alt Text:
+
+```         
+Line graph showing passenger traffic for six airports from 2020 to 2025. The x-axis shows year and the y-axis shows number of passengers. Each line represents each airport. Atlanta has the highest values over time.
+```
+
+### Long Description:
+
+This line graph shows how passenger traffic increased for six major airports from 2020 to 2025. The x-axis shows the year, and the y-axis shows the number of passengers. Each airport is represented by a different colored line. Overall, all the airports show a passenger increase per year following 2020, and I can assume this suggests that air travel slowly recovered from COVID in 2020, and increased passenger traffic. ATL consistently has a higher number of passengers over five years. Airports like DFW, DEN and ORD also show steady upward growths over five years. FRA starts off with much lower passenger traffic than the others in 2020, and even though it increases over time, it still remains lower than the other four airports. LAX also increases its passenger traffic overtime but remains slightly under the top three airports. Overall, the line graph helps me decide the top three busiest airports and a common decrease in 2020 for all five airports by clearly illustrating each of the variables.
+
+# Narrative Analysis:
+
+Observing both the polished table and the line graph, we can draw clear patterns about how passenger traffic changed from 2020 to 2025 in each airport. The table lets us see exact number values of passengers each year, while the graph helps us visualize it all together. One major pattern I can see in both the table and the graph is that 2020 had the lowest amount of passengers in each airport over the five years. This clearly suggests that COVID had a large effect on the amount of people flying from each airport due to reduced travel that year. We can also see that each airport steadily recovered following the decrease in 2020. All five airports saw a significant increase in passenger traffic after 2020. The graph clearly shows the upward trend in passenger traffic following 2020, and the table confirms the exact increases from year to year. Another important observation that I can draw from both the table and the graph is that ATL has consistently been the busiest airport among the five airports we have data for. The table shows me the exact highest values of ATL passengers, and the graph clearly shows ATL having the highest passenger traffic over all five years. Airports such as DFW, DEN, and ORD show strong growth in passengers over time, but they consistently remain below ATL. Lastly, FRA clearly stands out in the graph for remaining significantly under all the five airports. Although FRA passengers steadily increase over time, they remain significantly under the amount of passengers in all the other airports. The table helped me calculate that there was a 24,150,084 passenger difference between ATL and FRA in 2020. This entails that FRA is likely not a very busy airport, and I can interpret that it is not people's first airport choice to fly out of, possible due to location, ticket prices, or flight availability. Overall, the graph and table both provide me important information for passenger traffic over time, and I can see a clear pattern of passenger recovery following 2020 and difference in passengers between airports.
+
+# Monte Carlo Numerical Integration
+
+## Overview
+
+In this section, Monte Carlo simulation is used to estimate the value of a definite integral for a Weibull probability density function. The method works by randomly generating points inside a rectangular region and determining what proportion of those points fall under the curve. That proportion is then used to estimate the area.
+
+```{r}
+#| include: false
+
+library(dplyr)
+library(ggplot2)
+library(patchwork)
+
+monte_carlo_points <- function(n, x_min, x_max, y_min, y_max) {
+  data.frame(
+    x = runif(n, min = x_min, max = x_max),
+    y = runif(n, min = y_min, max = y_max)
+  )
+}
+
+x_min <- 0
+x_max <- 4
+y_min <- 0
+y_max <- 0.8
+rect_area <- (x_max - x_min) * (y_max - y_min)
+
+mc_plot <- function(n) {
+  mc_points <- monte_carlo_points(n, x_min, x_max, y_min, y_max)
+
+  mc_wrangled <- mc_points |>
+    mutate(
+      fx = dweibull(x, shape = 1.5, scale = 1),
+      position = if_else(y <= fx, "On/Below", "Above")
+    )
+
+  p_hat <- mean(mc_wrangled$position == "On/Below")
+  estimate <- p_hat * rect_area
+
+  ggplot(mc_wrangled, aes(x = x, y = y, color = position)) +
+    geom_point(alpha = 0.6, size = 1.2) +
+    stat_function(
+      fun = dweibull,
+      args = list(shape = 1.5, scale = 1),
+      xlim = c(0, 4),
+      linewidth = 1
+    ) +
+    labs(
+      title = paste("n =", n),
+      subtitle = paste("Estimate =", round(estimate, 4)),
+      x = "x",
+      y = "y",
+      color = "Point Position"
+    ) +
+    coord_cartesian(xlim = c(x_min, x_max), ylim = c(y_min, y_max)) +
+    theme_minimal()
+}
+
+plot10 <- mc_plot(10)
+plot100 <- mc_plot(100)
+plot1000 <- mc_plot(1000)
+plot10000 <- mc_plot(10000)
+
+## 
+
+
+```
+
+## Small Multiple Plot
+
+```{r}
+#| label: fig-mc
+#| fig-cap: "Monte Carlo integration estimates for a Weibull distribution using sample sizes of 10, 100, 1000, and 10000."
+#| fig-width: 9
+#| fig-height: 7
+
+plot10 + plot100 + plot1000 + plot10000
+```
+
+##### When prompted with the Monte Carlo small multiple visualization, ChatGPT-5.3 generated Alt text and Long Description text describing the distribution of points, the curve, and how the estimates improve as the number of points increases. (This exchange took place on April 15, 2026)
+
+##### Alt Text:
+
+A four-panel plot showing Monte Carlo integration of a Weibull distribution with sample sizes of 10, 100, 1000, and 10000. Each panel displays random points colored by whether they fall above the curve or on or below it. As the number of points increases, the estimate becomes closer to 1.
+
+### Long Description:
+
+This small multiple shows four graphs arranged in a grid, each using a different number of random points to estimate the area under the same curve. In the first graph with 10 points, the points are very sparse and the estimate is pretty inaccurate and far from the true value. In the second graph with 100 points, the estimate improves, but it still is not very accurate. In the third and fourth graphs, with 1000 and 10000 points, the points fill the space much more evenly and match the shape of the curve more closely. The estimates in those larger samples are close to 1, showing that the Monte Carlo method becomes more accurate as the number of points increases.
+
+# Narrative Analysis:
+
+The Monte Carlo small multiple plot shows how the estimate improves as the number of random points increases. In the first plot (n = 10), the points are very scattered and the estimate (1.92) is not accurate. With n = 100, the shape becomes clearer, but the estimate (0.8) is still off. By n = 1000, the points better follow the curve and the estimate (about 1.01) is much closer. In the final plot (n = 10000), the graph is dense and the estimate (about 1.018) is very close to 1. Overall, as more points are added, the estimates become more stable and accurate. Based on the larger sample sizes, I conclude the true value of the integral is about 1, since the estimates consistently approach this value.
+
+# Reflection:
+
+Throughout my time in STAT 184, I have truly improved my data analysis skills in ways I didn't even know were possible. I came into this class with knowledge on how to analyze data sets and draw conclusions from them, but this class provided me with in-depth, detailed data sets that improved my analysis skills. For example, the Pirates data set in HW 3.4 allowed me to explore 1000 pirate cases and 17 attributes. I chose pirate age and tattoos as my two attributes for the assignment. I learned lot by to picking two attributes of my choice and drawing a possible connection between them. Additionally, I found the busiest airports to be one of my favorite data sets. I thought it was very interesting and straightforward when it came to drawing claims such as COVID-19 having an effect on passenger traffic. STAT 184 provided me with larger data sets than I had ever explored before, and the freedom to choose attributes that I found personally interesting!
+
+# Code Appendix
+
+{{< pagebreak >}}
+
+```{r}
+#| label: codeAppend
+#| ref-label: !expr knitr::all_labels()
+#| echo: true
+#| eval: false
+
+```
+
+# GenAi Usage Appendix:
+
+\*\*Tool Used:\*\* ChatGPT (GPT-5.3, OpenAI)\
+\*\*Date of Use:\*\* April 15, 2026\
+\
+---\
+Quarto
+
+\*\*Prompts:\*\*\
+"Help me make my quarto outline more organized and use a professional font under my YAML"\
+"How to organize Appendix's in Quarto"\
+\
+\*\*Response:\*\*\
+ChatGPT provided YAML settings to improve layout, formatting guidance to organize the document, and appendix structure.\
+\
+---\
+\
+Alt Text and Long Description – Busiest Airports Table:\
+\
+\*\*Prompt(s):\*\*\
+"Can you provide me alt text and a long description for my busiest airports table"\
+\
+\*\*Response:\*\*\
+ChatGPT generated alt text and a long description explaining the structure of the table, including airport names, codes, and passenger totals from 2020 to 2025.\
+\
+---\
+\
+\## 3. Alt Text and Long Description – Busiest Airports Plot\
+\
+\*\*Prompt(s):\*\*\
+"Give me alt text and long description for my airports graph"\
+\
+\*\*Response:\*\*\
+ChatGPT generated alt text and a long description describing the line graph, including trends in passenger traffic and comparisons between airports over time.\
+\
+---\
+\
+\## 4. Alt Text and Long Description – Monte Carlo Plot\
+\
+\*\*Prompt(s):\*\*\
+"Give me alt text and long description for my Monte Carlo plot"\
+\
+\*\*Response:\*\*\
+ChatGPT generated alt text and a long description explaining the small multiple plots, the distribution of points, and how estimates improve as the number of points increases.\
+\
+---
