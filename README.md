@@ -4,8 +4,20 @@
 
 #ReadME
 
-# -Create public repo
-# -Load Quarto PDF and QMD File
-# -Log issues and make meaningful commits
-# -Make sure all aspects are working properly
-# -Compare to rubric in MOM
+## About
+This repository contains all the details from HW 4.3. It includes my Quarto document and my .qmd. 
+
+## Data Source
+The datasets used throughout this assignment were provided from STAT 184. 
+
+## Plan
+I developed this assignment by organizing my code from HW 4.3, write a thorough report, and rendering the Quarto file PDF. 
+
+## Organization
+HW 4.3.qmd: main file analysis
+HW 4.3 PDF: final rendered document submitted
+
+# Contact
+Mihika Choudhary
+mjc8089@psu.edu
+
